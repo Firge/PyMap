@@ -186,8 +186,11 @@ def search():
 
 
 def delete():
+    global pt, image
     box.text = ''
     box.update()
+    pt = None
+    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
 
 
 pygame.mouse.set_cursor(*pygame.cursors.arrow)
