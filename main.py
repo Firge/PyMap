@@ -131,6 +131,8 @@ def image_by_coords(coords, **kwargs):
         "l": 'map',
         "ll": ','.join(coords)}
     map_params.update(kwargs)
+    if map_params['pt'] is None:
+        map_params.pop('pt')
     response = requests.get(map_server, params=map_params)
     map_file = "map.png"
     with open(map_file, "wb") as file:
@@ -172,14 +174,15 @@ def next_view():
 
 
 def search():
-    global image, coords
+    global image, coords, pt
     try:
         data = parse_geocoder_data(data_by_address(box.text))
     except Exception:
         return
     print(data)
     coords = data['coords']
-    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=f"{coords[0]},{coords[1]},pm2rdm")
+    pt = f"{coords[0]},{coords[1]},pm2rdm"
+    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
 
 
 def delete():
@@ -194,6 +197,7 @@ sizes = ["90,90", "50,50", "40,40", "20,20", "10,10", "5,5",
          "0.1,0.1", "0.05,0.05", "0.025,0.025", "0.01,0.01",
          "0.005,0.005", "0.0025,0.0025", "0.001,0.001", "0.0005,0.0005"]
 views = itertools.cycle(['map', 'sat', 'sat,skl'])
+pt = None
 
 buttons = pygame.sprite.Group()
 
@@ -221,7 +225,7 @@ box.resize(200, 40)
 
 delta = 9
 view = next(views)
-image = image_by_coords([str(x) for x in coords], spn=sizes[delta])
+image = image_by_coords([str(x) for x in coords], spn=sizes[delta], pt=pt)
 running = True
 while running:
     for event in pygame.event.get():
@@ -231,32 +235,32 @@ while running:
                 if delta == 18:
                     continue
                 delta += 1
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
             elif event.key == pygame.K_PAGEDOWN:
                 if delta == 0:
                     continue
                 delta -= 1
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
             elif event.key == pygame.K_UP:
                 dlt = float(sizes[delta].split(',')[0])
                 if coords[1] + dlt >= 90 - dlt:
                     continue
                 coords = (coords[0], coords[1] + dlt)
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
             elif event.key == pygame.K_DOWN:
                 dlt = float(sizes[delta].split(',')[0])
                 if coords[1] - dlt <= -90 + dlt:
                     continue
                 coords = (coords[0], coords[1] - dlt)
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
             elif event.key == pygame.K_LEFT:
                 dlt = float(sizes[delta].split(',')[0])
                 coords = ((coords[0] - dlt * 1.5 + 180) % 360 - 180, coords[1])
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
             elif event.key == pygame.K_RIGHT:
                 dlt = float(sizes[delta].split(',')[0])
                 coords = ((coords[0] + dlt * 1.5 + 180) % 360 - 180, coords[1])
-                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+                image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
         elif event.type == pygame.QUIT:
             running = False
     screen.blit(image, (0, 0))
