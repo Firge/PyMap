@@ -176,7 +176,7 @@ def next_view():
 
 
 def search():
-    global image, coords, pt, address
+    global image, coords, pt, address, postal
     try:
         data = parse_geocoder_data(data_by_address(box.text))
     except Exception:
@@ -185,15 +185,25 @@ def search():
     pt = f"{coords[0]},{coords[1]},pm2rdm"
     image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
     address = data['address']
+    try:
+        postal = data['postal_code']
+    except KeyError:
+        postal = ''
 
 
 def delete():
-    global pt, image, address
+    global pt, image, address, postal
     box.text = ''
     box.update()
     pt = None
     address = ''
+    postal = ''
     image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
+
+
+def postal_visible():
+    global postal_is_visible
+    postal_is_visible = not postal_is_visible
 
 
 pygame.mouse.set_cursor(*pygame.cursors.arrow)
@@ -227,6 +237,15 @@ delete_button.set_surface(load_image('delete_button.png'))
 delete_button.set_hover_surface(load_image('delete_button_hover.png'))
 delete_button.connect(delete)
 delete_button.move(252, 12)
+
+postal_button = Button()
+postal_button.set_surface(load_image('postal_button.png'))
+postal_button.set_hover_surface(load_image('postal_button_hover.png'))
+postal_button.connect(postal_visible)
+postal_button.move(548, 64)
+
+postal = ''
+postal_is_visible = False
 
 box = Input()
 box.move(12, 12)
@@ -283,6 +302,8 @@ while running:
             else:
                 line = line + address[i]
         address_lined.append(line)
+        if postal_is_visible and postal:
+            address_lined.append(postal)
         surface = pygame.surface.Surface((280, 20 + len(address_lined) * 20))
         surface.fill((255, 255, 255))
         pygame.draw.rect(surface, (230, 230, 230), (0, 0, 280, 20 + len(address_lined) * 20), 1)
