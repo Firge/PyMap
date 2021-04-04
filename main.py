@@ -81,13 +81,13 @@ class Input(pygame.sprite.Sprite):
             else:
                 self.text = self.text + event.unicode
             self.image = self.box.copy()
-            self.image.blit(self.font.render(self.text, False, (0, 0, 0)),
+            self.image.blit(self.font.render(self.text, True, (0, 0, 0)),
                             (5, (self.rect.height - self.font.get_height()) // 2))
             self.image.blit(self.cursor, (self.font.size(self.text)[0] + 4,
                                           (self.rect.height - self.font.get_height()) // 2))
         elif args and args[0].type == pygame.MOUSEBUTTONDOWN:
             self.image = self.box.copy()
-            self.image.blit(self.font.render(self.text, False, (0, 0, 0)),
+            self.image.blit(self.font.render(self.text, True, (0, 0, 0)),
                             (5, (self.rect.height - self.font.get_height()) // 2))
             if self.rect.collidepoint(args[0].pos):
                 self.active = True
@@ -164,6 +164,8 @@ def parse_geocoder_data(data):
     ret = {'address': data['metaDataProperty']['GeocoderMetaData']['Address']['formatted'],
            'coords': tuple(map(float, data['Point']['pos'].split())),
            'delta': delta}
+    if 'postal_code' in data['metaDataProperty']['GeocoderMetaData']['Address']:
+        ret['postal_code'] = data['metaDataProperty']['GeocoderMetaData']['Address']['postal_code']
     return ret
 
 
@@ -174,22 +176,23 @@ def next_view():
 
 
 def search():
-    global image, coords, pt
+    global image, coords, pt, address
     try:
         data = parse_geocoder_data(data_by_address(box.text))
     except Exception:
         return
-    print(data)
     coords = data['coords']
     pt = f"{coords[0]},{coords[1]},pm2rdm"
     image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
+    address = data['address']
 
 
 def delete():
-    global pt, image
+    global pt, image, address
     box.text = ''
     box.update()
     pt = None
+    address = ''
     image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
 
 
@@ -215,6 +218,9 @@ search_button.set_surface(load_image('search_button.png'))
 search_button.set_hover_surface(load_image('search_button_hover.png'))
 search_button.connect(search)
 search_button.move(212, 12)
+
+address = ''
+address_font = pygame.font.SysFont('Times New Roman', 14)
 
 delete_button = Button()
 delete_button.set_surface(load_image('delete_button.png'))
@@ -267,6 +273,23 @@ while running:
         elif event.type == pygame.QUIT:
             running = False
     screen.blit(image, (0, 0))
+    if address:
+        address_lined = []
+        line = ''
+        for i in range(len(address)):
+            if address_font.size(line + address[i])[0] > 270:
+                address_lined.append(line)
+                line = address[i]
+            else:
+                line = line + address[i]
+        address_lined.append(line)
+        surface = pygame.surface.Surface((280, 20 + len(address_lined) * 20))
+        surface.fill((255, 255, 255))
+        pygame.draw.rect(surface, (230, 230, 230), (0, 0, 280, 20 + len(address_lined) * 20), 1)
+        for i in range(len(address_lined)):
+            surface.blit(address_font.render(address_lined[i], True, (0, 0, 0)),
+                         (5, (40 - address_font.get_height()) // 2 + i * 20))
+        screen.blit(surface, (12, 64))
     buttons.draw(screen)
     pygame.display.flip()
 pygame.quit()
