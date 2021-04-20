@@ -3,6 +3,7 @@ import os
 import pygame
 import itertools
 import sys
+
 pygame.init()
 screen = pygame.display.set_mode((600, 450))
 
@@ -28,22 +29,24 @@ class Button(pygame.sprite.Sprite):
         self.function = function
 
     def update(self, *args, **kwargs):
-        if args and args[0].type == pygame.MOUSEBUTTONUP and self.rect.collidepoint(args[0].pos):
+        if args and args[0].type == pygame.MOUSEBUTTONUP and self.collide(args[0].pos):
             self.function()
         if args and args[0].type == pygame.MOUSEMOTION:
             if self.hover:
-                if not self.rect.collidepoint(args[0].pos):
+                if not self.collide(args[0].pos):
                     self.hover = False
                     self.image, self.hover_image = self.hover_image, self.image
             else:
-                if self.rect.collidepoint(args[0].pos):
+                if self.collide(args[0].pos):
                     self.hover = True
                     self.image, self.hover_image = self.hover_image, self.image
-
 
     def set_surface(self, surface: pygame.surface.Surface):
         self.image = surface
         self.rect.width, self.rect.height = self.image.get_size()
+
+    def collide(self, pos):
+        return self.rect.collidepoint(pos)
 
     def set_hover_surface(self, surface: pygame.surface.Surface):
         self.hover_image = surface
@@ -89,14 +92,14 @@ class Input(pygame.sprite.Sprite):
             self.image = self.box.copy()
             self.image.blit(self.font.render(self.text, True, (0, 0, 0)),
                             (5, (self.rect.height - self.font.get_height()) // 2))
-            if self.rect.collidepoint(args[0].pos):
+            if self.collide(args[0].pos):
                 self.active = True
                 self.image.blit(self.cursor, (self.font.size(self.text)[0] + 4,
                                               (self.rect.height - self.font.get_height()) // 2))
             else:
                 self.active = False
         elif args and args[0].type == pygame.MOUSEMOTION:
-            if self.rect.collidepoint(args[0].pos):
+            if self.collide(args[0].pos):
                 if not self.hover:
                     self.hover = True
                     cursor = pygame.cursors.compile(pygame.cursors.textmarker_strings)
@@ -107,6 +110,9 @@ class Input(pygame.sprite.Sprite):
 
         elif not args:
             self.image = self.box.copy()
+
+    def collide(self, pos):
+        return self.rect.collidepoint(pos)
 
 
 def load_image(name, colorkey=None):
@@ -128,6 +134,8 @@ def load_image(name, colorkey=None):
 def image_by_coords(coords, **kwargs):
     map_server = 'https://static-maps.yandex.ru/1.x/'
     map_params = {
+        'size': '600,450',
+        'spn': sizes[delta],
         "l": 'map',
         "ll": ','.join(coords)}
     map_params.update(kwargs)
@@ -156,6 +164,20 @@ def data_by_address(address):
     return data
 
 
+def data_by_coords(coords, **kwargs):
+    geocoder_server = 'http://geocode-maps.yandex.ru/1.x/'
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": ','.join(coords),
+        "format": "json",}
+    geocoder_params.update(kwargs)
+    response = requests.get(geocoder_server, params=geocoder_params)
+    json_response = response.json()
+    data = json_response["response"]["GeoObjectCollection"][
+        "featureMember"][0]["GeoObject"]
+    return data
+
+
 def parse_geocoder_data(data):
     bounded = data['boundedBy']['Envelope']
     lower = tuple(map(float, bounded['lowerCorner'].split()))
@@ -169,10 +191,25 @@ def parse_geocoder_data(data):
     return ret
 
 
+def data_by_coords_kind(coords, kind):
+    search_api_server = "https://search-maps.yandex.ru/v1/"
+    api_key = "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3"
+    search_params = {
+        "apikey": api_key,
+        "text": kind,
+        "lang": "ru_RU",
+        "ll": coords,
+        "type": "biz"
+    }
+    response = requests.get(search_api_server, params=search_params)
+    data = response.json()
+    return data
+
+
 def next_view():
-    global view, image
+    global view, image, pt
     view = next(views)
-    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view)
+    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
 
 
 def search():
@@ -289,6 +326,38 @@ while running:
                 dlt = float(sizes[delta].split(',')[0])
                 coords = ((coords[0] + dlt * 1.5 + 180) % 360 - 180, coords[1])
                 image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == pygame.BUTTON_LEFT:
+                print(1467)
+                if not any([x.collide(event.pos) for x in buttons]):
+                    x1, y1 = event.pos
+                    y1 = 450 - y1
+                    sizet = sizes[delta].split(',')
+                    abcords = (coords[0] - float(sizet[0]) / 2, coords[1] - float(sizet[1]) / 2)
+                    target_cords = (abcords[0] + (x1 / 600 * float(sizet[0])), abcords[1] + (y1 / 450 * float(sizet[1])))
+                    pt = f"{target_cords[0]},{target_cords[1]},pm2rdm"
+                    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
+                    data = parse_geocoder_data(data_by_coords(list(map(str, target_cords))))
+                    try:
+                        postal = data['postal_code']
+                    except Exception:
+                        postal = ''
+                    address = data['address']
+            elif event.button == pygame.BUTTON_RIGHT:
+                print(68869)
+                if not any([x.collide(event.pos) for x in buttons]):
+                    x1, y1 = event.pos
+                    y1 = 450 - y1
+                    sizet = sizes[delta].split(',')
+                    abcords = (coords[0] - float(sizet[0]) / 2, coords[1] - float(sizet[1]) / 2)
+                    target_cords = (abcords[0] + (x1 / 600 * float(sizet[0])), abcords[1] + (y1 / 450 * float(sizet[1])))
+                    data = data_by_coords_kind(f"{target_cords[0]},{target_cords[1]}", "Организация")
+                    address = data['features'][0]['properties']['name']
+                    target_cords = data['features'][0]['geometry']['coordinates']
+                    print(address, target_cords)
+                    pt = f"{target_cords[0]},{target_cords[1]},pm2rdm"
+                    image = image_by_coords([str(x) for x in coords], spn=sizes[delta], l=view, pt=pt)
+
         elif event.type == pygame.QUIT:
             running = False
     screen.blit(image, (0, 0))
